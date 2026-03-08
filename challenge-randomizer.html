@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge List Randomizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #2a2a3a;
+    --accent: #ff6b35;
+    --accent2: #ffb347;
+    --gold: #ffd700;
+    --text: #e8e8f0;
+    --muted: #6b6b88;
+    --main-glow: rgba(255, 107, 53, 0.15);
+    --legacy-color: #7c70c4;
+    --removed-color: #c45555;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,107,53,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,107,53,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .site-tag {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 12px;
+    margin-bottom: 16px;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(52px, 10vw, 88px);
+    line-height: 0.9;
+    letter-spacing: 2px;
+    color: var(--text);
+    text-shadow: 0 0 80px rgba(255,107,53,0.3);
+  }
+
+  h1 span {
+    color: var(--accent);
+    display: block;
+  }
+
+  .subtitle {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  /* Filter toggles */
+  .filters {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+
+  .filter-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    padding: 8px 18px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  .filter-btn.active[data-type="main"] {
+    border-color: var(--accent);
+    background: rgba(255,107,53,0.12);
+    color: var(--accent);
+  }
+  .filter-btn.active[data-type="legacy"] {
+    border-color: var(--legacy-color);
+    background: rgba(124,112,196,0.12);
+    color: var(--legacy-color);
+  }
+  .filter-btn.active[data-type="removed"] {
+    border-color: var(--removed-color);
+    background: rgba(196,85,85,0.12);
+    color: var(--removed-color);
+  }
+
+  /* Roll button */
+  .roll-btn {
+    display: block;
+    width: 100%;
+    padding: 20px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 4px;
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .roll-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.4s;
+  }
+
+  .roll-btn:hover::after { transform: translateX(100%); }
+  .roll-btn:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 8px 30px rgba(255,107,53,0.4); }
+  .roll-btn:active { transform: translateY(1px); }
+  .roll-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Result card */
+  .result-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 0;
+    display: none;
+    overflow: hidden;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    margin-bottom: 32px;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-card.visible { display: block; }
+
+  .card-header {
+    padding: 6px 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .card-header.type-main { background: rgba(255,107,53,0.15); color: var(--accent); border-bottom: 1px solid rgba(255,107,53,0.2); }
+  .card-header.type-legacy { background: rgba(124,112,196,0.15); color: var(--legacy-color); border-bottom: 1px solid rgba(124,112,196,0.2); }
+  .card-header.type-removed { background: rgba(196,85,85,0.15); color: var(--removed-color); border-bottom: 1px solid rgba(196,85,85,0.2); }
+
+  .card-body {
+    padding: 28px 28px 24px;
+  }
+
+  .rank-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .level-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(36px, 7vw, 56px);
+    line-height: 1;
+    color: var(--text);
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    word-break: break-word;
+  }
+
+  .level-author {
+    font-size: 15px;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .level-author strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.15s;
+  }
+
+  .action-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(255,107,53,0.08);
+  }
+
+  /* History */
+  .history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .history-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .clear-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .clear-btn:hover { color: var(--removed-color); }
+
+  #history-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-left: 2px solid transparent;
+    font-size: 14px;
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .history-item.type-main { border-color: rgba(255,107,53,0.4); }
+  .history-item.type-legacy { border-color: rgba(124,112,196,0.4); }
+  .history-item.type-removed { border-color: rgba(196,85,85,0.4); }
+
+  .history-rank {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 36px;
+  }
+
+  .history-name {
+    flex: 1;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .history-author {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+  }
+
+  /* empty state */
+  #history-section { display: none; }
+
+  /* Stats bar */
+  .stats-row {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 32px;
+  }
+
+  .stat {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* Shuffle animation */
+  @keyframes shuffle {
+    0%,100% { transform: translateY(0); }
+    25% { transform: translateY(-4px); }
+    75% { transform: translateY(4px); }
+  }
+
+  .roll-btn.rolling { animation: shuffle 0.1s ease infinite; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="site-tag">challengelist.gd</div>
+    <h1>CHALLENGE<span>ROULETTE</span></h1>
+    <p class="subtitle">408 challenges · spin to pick</p>
+  </header>
+
+  <div class="filters">
+    <button class="filter-btn active" data-type="main">⚡ Main List (1–100)</button>
+    <button class="filter-btn active" data-type="legacy">☁ Legacy (101–374)</button>
+    <button class="filter-btn active" data-type="removed">✕ Removed (375–408)</button>
+  </div>
+
+  <div class="stats-row" id="stats-row" style="display:none">
+    <div class="stat"><div class="stat-num" id="stat-rolled">0</div><div class="stat-label">Rolled</div></div>
+    <div class="stat"><div class="stat-num" id="stat-unique">0</div><div class="stat-label">Unique</div></div>
+    <div class="stat"><div class="stat-num" id="stat-pool">0</div><div class="stat-label">Pool</div></div>
+  </div>
+
+  <button class="roll-btn" id="roll-btn" onclick="roll()">🎲 ROLL CHALLENGE</button>
+
+  <div class="result-card" id="result-card">
+    <div class="card-header" id="card-header"></div>
+    <div class="card-body">
+      <div class="rank-badge" id="lv-rank"></div>
+      <div class="level-name" id="lv-name"></div>
+      <div class="level-author">by <strong id="lv-author"></strong></div>
+      <div class="card-actions">
+        <a class="action-btn" id="lv-link" href="#" target="_blank">View on List →</a>
+        <button class="action-btn" onclick="roll()">Roll Again</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="history-section">
+    <div class="history-header">
+      <span class="history-title">History</span>
+      <button class="clear-btn" onclick="clearHistory()">Clear</button>
+    </div>
+    <div id="history-list"></div>
+  </div>
+
+</div>
+
+<script>
+const ALL_CHALLENGES = [
+  // MAIN LIST (1–100)
+  [1,"Illusion of Hell","Exen","main"],[2,"Re","torn49","main"],[3,"VSC","BoBoBoBoBoBoBo","main"],[4,"3SH on Pointercrate","mokgaming67","main"],[5,"FINAL FANTASY","telepracity","main"],[6,"my backyard","Zenmode","main"],[7,"anodyne","zXdasfsa","main"],[8,"INTERCONNECTED","NucDev","main"],[9,"bosco busch","023bbAV6i","main"],[10,"EXPIRATION DATE","Quad","main"],[11,"CorroZ B","jcack","main"],[12,"Oblivers","Zentraa","main"],[13,"aztec rave monkey","Zenmode","main"],[14,"Solaria","Zenmode","main"],[15,"mystic haze","Conix","main"],[16,"SADOMASOCHISM","Nyan Cat","main"],[17,"NcaT Challenge","Kolzaru","main"],[18,"50","Zenmode","main"],[19,"EVIL","Hellfire2603","main"],[20,"Paraballa","Gorling","main"],[21,"lava","DenseCabbage","main"],[22,"Stercore","Quberry","main"],[23,"Vomit Rose","Zenmode","main"],[24,"Dredlethal VantamaxX","Doopliss","main"],[25,"Chromium","lunatismm","main"],[26,"Screaming","torn49","main"],[27,"Falling Illusion","Exen","main"],[28,"GRIM","NucDev","main"],[29,"Our Special Place","DaG","main"],[30,"VENUS","Seaze","main"],[31,"Fried lEgg","IAmNot60hz","main"],[32,"Torrent","Fossa","main"],[33,"Zapped Balls","Revenant","main"],[34,"Granola bar","m/","main"],[35,"Apocalypse","torn49","main"],[36,"racketeering v2","DenseCabbage","main"],[37,"HAZARD","iamfinley","main"],[38,"Murder Mitten","mark.","main"],[39,"adrogantiam","Zenmode","main"],[40,"Blissful","Helix","main"],[41,"khmeli suneli","kwezy","main"],[42,"Hell Ball Finale","romgames","main"],[43,"Cobalt Phosphate","Zenmode","main"],[44,"BLEED","sincos","main"],[45,"ktw","HaydenDom","main"],[46,"lightposts","HaydenDom","main"],[47,"Sad Chamber","nobbbin","main"],[48,"UFO Nation","Destroyer0912","main"],[49,"Unnamed 1","Nyan Cat","main"],[50,"AOKA","CuberCube","main"],[51,"Philly","jcack","main"],[52,"wpopoff challenge","EatingBabies","main"],[53,"Moscow Moment","coakmuffer","main"],[54,"b","DrakXD109","main"],[55,"Evil Dezstro 2 verif","LunarLotus","main"],[56,"beruliam","Milo","main"],[57,"521","Nyan Cat","main"],[58,"Lost Sense","modc","main"],[59,"chesnok","torn49","main"],[60,"Romeo","iamfinley","main"],[61,"Les Rouleaux","rosaliedu38","main"],[62,"continuum","TheRealGamma","main"],[63,"ReTraYsiS","killburst","main"],[64,"Glaz Diavola","Milinochka","main"],[65,"ingrown toenail 3","Eclipse","main"],[66,"Vigorous Verdict","ionlycreate","main"],[67,"mestupid challenger","Acratic","main"],[68,"AFP tunnel","Zenmode","main"],[69,"Sadism","Irisu","main"],[70,"Last Prism","scorpion","main"],[71,"sadrisE","justaspoon2","main"],[72,"Burnout","shdrr","main"],[73,"JENOVA","anixlol","main"],[74,"Doodkey to Zhirdow","1goOse","main"],[75,"ash","kwezy","main"],[76,"Sunken","Quad","main"],[77,"Viridescent","parker","main"],[78,"Desiderium Doloris","torn49","main"],[79,"Kokomo","HaydenDom","main"],[80,"Chains Binding","NucDev","main"],[81,"Flutterwonder","DaG","main"],[82,"Delusion","xEl3cTr0","main"],[83,"habit","seels55","main"],[84,"yossarian challenge","Seebi","main"],[85,"2hreddies","inf7","main"],[86,"Envenomed","xEl3cTr0","main"],[87,"woopie","Avexa","main"],[88,"Steel","iamfinley","main"],[89,"Bitched Machine","Nyan Cat","main"],[90,"FENT CHALLANGE","Kirigamiyyy","main"],[91,"Mima","Franzy","main"],[92,"Hateoul Loves Robot","EatingBabies","main"],[93,"Stratus","lunatismm","main"],[94,"Lost Planet","Vague","main"],[95,"nepotism","iamfinley","main"],[96,"aloe","Avexa","main"],[97,"Final Spark","ProStylePancake","main"],[98,"Lament","Fluff467","main"],[99,"Aries","NucDev","main"],[100,"Feelings","flsey","main"],
+  // LEGACY (101–374)
+  [101,"Rich Minion v2","1airless","legacy"],[102,"Above Gear","benedikT","legacy"],[103,"Apotheosis","xEl3cTr0","legacy"],[104,"Foolsong","NucDev","legacy"],[105,"Soulwind","Quberry","legacy"],[106,"Waver","Exen","legacy"],[107,"ee","Nyan Cat","legacy"],[108,"Dark","pohgii","legacy"],[109,"Nine","lMilez","legacy"],[110,"Vanuatu","nayf","legacy"],[111,"Hostage","mark.","legacy"],[112,"Sephiroth","anixlol","legacy"],[113,"Beside You","maxmur","legacy"],[114,"Gamma Dan","BiancaDiAngelo","legacy"],[115,"Above the Clouds","NucDev","legacy"],[116,"fergon challenge v2","Comlayze","legacy"],[117,"Thunder Blade","Vague","legacy"],[118,"stellar","kwezy","legacy"],[119,"cooks","HaydenDom","legacy"],[120,"Scorched Balls","KSol","legacy"],[121,"Exquisite Difficulty","Masachin","legacy"],[122,"Silent Mode","Wonter","legacy"],[123,"HANSO FOUNDATION","KyuPlays","legacy"],[124,"Sinister Vermilion","ionlycreate","legacy"],[125,"TSVESTA 2024","zNeon0","legacy"],[126,"TwigFrost","NucDev","legacy"],[127,"C U H","VoltrixAce","legacy"],[128,"DHARMA INITIATIVE","KyuPlays","legacy"],[129,"lucy","HaydenDom","legacy"],[130,"Lost to this monster","Scorch9","legacy"],[131,"Deorum","Exen","legacy"],[132,"nothing","torn49","legacy"],[133,"Stay Still","NineDice","legacy"],[134,"Prismatic Storm","zXdasfsa","legacy"],[135,"Deranged","RoinTnT123","legacy"],[136,"DIKEMBE","sincos","legacy"],[137,"Toxic Blades","xEl3cTr0","legacy"],[138,"grapumpkin","ChatGPTGaming","legacy"],[139,"Cleveland Metal","ElohmroW","legacy"],[140,"U","Nyan Cat","legacy"],[141,"VAMP ANTHEM","xaern","legacy"],[142,"Die a King","torn49","legacy"],[143,"Rat Poison","Acratic","legacy"],[144,"mescaline","zXdasfsa","legacy"],[145,"Gloom","xEl3cTr0","legacy"],[146,"1000 Orbs","polterghast12","legacy"],[147,"SamtheFman Challenge","SkyJax","legacy"],[148,"MasterOogway Challen","ChatGPTGaming","legacy"],[149,"UBER Cooling Unit","IIKugelBlitZII","legacy"],[150,"UFokinWotNyanCat III","FakezZoink","legacy"],[151,"AAHhaahahAHAAHahahah","maxmur","legacy"],[152,"Solar Wind","vanious","legacy"],[153,"Shock","Exen","legacy"],[154,"Craven Soul","NineDice","legacy"],[155,"T3CHNO LOV3","DaG","legacy"],[156,"NITROGEN REDUX","X99","legacy"],[157,"Femboy Gang","OverGD","legacy"],[158,"My Gardens Hallows","annimik","legacy"],[159,"Sheol Death","UFWM","legacy"],[160,"Macarron","ErinaLaSacarina","legacy"],[161,"lebron james","LAMINGTON","legacy"],[162,"Hello Chat","DarkBear5","legacy"],[163,"Very Hard Challenge","IIKugelBlitZII","legacy"],[164,"Happiness","Aespha","legacy"],[165,"Howl of Ween","DenseCabbage","legacy"],[166,"Distraught","maxmur","legacy"],[167,"Eruptive Fragment","DarkBear5","legacy"],[168,"Galaxy","KyuPlays","legacy"],[169,"Temporal","jcack","legacy"],[170,"RIP","maxmur","legacy"],[171,"Spatial","HaydenDom","legacy"],[172,"Dazed","Semispace","legacy"],[173,"Distorted","NineDice","legacy"],[174,"Beta Dan","BiancaDiAngelo","legacy"],[175,"Jasmine","RoinTnT123","legacy"],[176,"Coakmuffe","Futcheeslove","legacy"],[177,"Serenity","Semispace","legacy"],[178,"Lamented","modc","legacy"],[179,"Black Lung X","Scware","legacy"],[180,"BERSERKER","idiocy","legacy"],[181,"DAYDREAM","Seaze","legacy"],[182,"Emperor","mark.","legacy"],[183,"Virulent Verge","NineDice","legacy"],[184,"Septalogue","Nyan Cat","legacy"],[185,"Bocadillo De Albondi","Yossarian","legacy"],[186,"SPACE BOY","Seaze","legacy"],[187,"Twinkle Toes","ChatGPTGaming","legacy"],[188,"Nothing Special","something1121","legacy"],[189,"Riff Wraiths","lMilez","legacy"],[190,"Crumbling","tapdot","legacy"],[191,"Impertinenced","nintenfox","legacy"],[192,"nobbbin challenge","Vague","legacy"],[193,"spike depression","sincos","legacy"],[194,"The P Machine","D3lteX","legacy"],[195,"Guys","DIIIS thik","legacy"],[196,"Hell Ball III","romgames","legacy"],[197,"Pumpernickel","ArabicGaming","legacy"],[198,"TACO REDUX","KyuPlays","legacy"],[199,"Adoraballa","scorpion","legacy"],[200,"nfl the movie 83","Acratic","legacy"],[201,"The Furry Vaccine","Bigthunder556","legacy"],[202,"wave TECHNIC v2","HaydenDom","legacy"],[203,"Taurus","IAmNot60hz","legacy"],[204,"Quite Hard Challenge","IIKugelBlitZII","legacy"],[205,"DANCE","Llqne","legacy"],[206,"OWL CITY CHALLENGE","JoinMolten","legacy"],[207,"Viper","Voidstrike","legacy"],[208,"romgames","M4nst3r","legacy"],[209,"Zephyr","Semispace","legacy"],[210,"NB12","Yossarian","legacy"],[211,"hallucinogen","SeptaGon7","legacy"],[212,"Baphomet","nayf","legacy"],[213,"Challenge XIX","Gooey","legacy"],[214,"Dissonance","NineDice","legacy"],[215,"yoshi island","Fergon","legacy"],[216,"Cooked Balls","MeatiusGaming","legacy"],[217,"Flyers","Zentraa","legacy"],[218,"S M I L E","DaG","legacy"],[219,"Activate","zNeon0","legacy"],[220,"coughy bean","jcack","legacy"],[221,"Berenjena","ErinaLaSacarina","legacy"],[222,"Cold Reading","lMilez","legacy"],[223,"Sprite People","nayf","legacy"],[224,"Corroz by Casmon","Electrolyte99","legacy"],[225,"Sizzling Balls","M4nst3r","legacy"],[226,"slowfastwave","Quberry","legacy"],[227,"wave challenge yossa","Nyan Cat","legacy"],[228,"I Wave","Vainyy","legacy"],[229,"fuclk CHALLENGE","Nyan Cat","legacy"],[230,"Tartarus","Nyan Cat","legacy"],[231,"Spitting Bar","JoinMolten","legacy"],[232,"Alphanetic is Trash","Asdner","legacy"],[233,"Vicious End","CarKano","legacy"],[234,"Duplexity","Splinter25","legacy"],[235,"Vesivius","NineDice","legacy"],[236,"Hill","Exen","legacy"],[237,"Soccermoms","lMilez","legacy"],[238,"Agile","nayf","legacy"],[239,"Radiation","ionlycreate","legacy"],[240,"Superr Challenge","BoBoBoBoBoBoBo","legacy"],[241,"BIBLE STUDY","Zeronium","legacy"],[242,"Flame","flamongo","legacy"],[243,"SuetistiC","Wintter","legacy"],[244,"kolbasa mastery","SeaWolfMikes","legacy"],[245,"The Acro Challenge","MetaManZ","legacy"],[246,"Alpha Dan","BiancaDiAngelo","legacy"],[247,"Siding challenge","BrutalSword107","legacy"],[248,"Frys queen dine","BrutalSword107","legacy"],[249,"rin04 challenge","nobbbin","legacy"],[250,"Quotient","DoubleEggSalad","legacy"],[251,"jamjam chall 3","coakmuffer","legacy"],[252,"Another Skribbl","lMilez","legacy"],[253,"Nino Nakano","Franzy","legacy"],[254,"Slightly buffed Bath","Yossarian","legacy"],[255,"Slightly buffed Math","Yossarian","legacy"],[256,"Vera Lynn","Zeronium","legacy"],[257,"dark tides","maxmur","legacy"],[258,"Samsung Galaxy Fold","Zerviot","legacy"],[259,"Sideflip","GenoXideGD","legacy"],[260,"I Cry","CursedZ","legacy"],[261,"gloom doom vsc 2 far","Trick","legacy"],[262,"66 blue","toonm","legacy"],[263,"Tuliva","nayf","legacy"],[264,"Nauru","Nyan Cat","legacy"],[265,"Benzherep 2","telepracity","legacy"],[266,"Ravioli","Toastii","legacy"],[267,"Rat Trap","mark.","legacy"],[268,"Clouded Park","mark.","legacy"],[269,"ingrown toenail 2","Eclipse","legacy"],[270,"OXYGEN REDUX","X99","legacy"],[271,"Silence","Zeronium","legacy"],[272,"Cong Challenge IV","lMilez","legacy"],[273,"Illusion","Semispace","legacy"],[274,"KOWABUNGA","LTerra","legacy"],[275,"No Rider","jcack","legacy"],[276,"The Unseen","Zeronium","legacy"],[277,"silent terror","Fossa","legacy"],[278,"Slightly buffed Cata","MeatiusGaming","legacy"],[279,"Coggers","Zentraa","legacy"],[280,"Pickle Chamber","Acratic","legacy"],[281,"Waveeeeee","Exen","legacy"],[282,"Africa Chamber","BoBoBoBoBoBoBo","legacy"],[283,"MeatiusShutUp","Pixel YT","legacy"],[284,"ILY","Yossarian","legacy"],[285,"FLATLINE","Zeronium","legacy"],[286,"Silly Sucker","Stitze","legacy"],[287,"Inchoation","AdqmGD","legacy"],[288,"Kubik","BiancaDiAngelo","legacy"],[289,"Dolphy Challenge 2","BiancaDiAngelo","legacy"],[290,"Dissipate","NineDice","legacy"],[291,"Vandal","Sledgehammer","legacy"],[292,"wave TECHNIC","jcack","legacy"],[293,"Masochism II","Irisu","legacy"],[294,"Carbon Commination","Wvffles","legacy"],[295,"trap monitor breed","scorpion","legacy"],[296,"PenitencE","Zain","legacy"],[297,"Masochism","Irisu","legacy"],[298,"Zeronium","Zeronium","legacy"],[299,"Crystalline","exerity","legacy"],[300,"Transient","ChatGPTGaming","legacy"],[301,"Last Minute","Emaen","legacy"],[302,"gay lol 4","Doopliss","legacy"],[303,"Action","Cursed","legacy"],[304,"Raw Sausage so tasty","BoBoBoBoBoBoBo","legacy"],[305,"Clicktrap","Extravagon","legacy"],[306,"Skribbl Challenge","lMilez","legacy"],[307,"First Circle","Paranoiac","legacy"],[308,"Challenge XIV","Gooey","legacy"],[309,"Crimson Christmas","KyuPlays","legacy"],[310,"Dark Melodies","DaG","legacy"],[311,"NEODYMIUM","Fergon","legacy"],[312,"D minor","48exa","legacy"],[313,"STTBG","hyakubands","legacy"],[314,"a moment in hell x2","nerveless","legacy"],[315,"Naufira","hyakubands","legacy"],[316,"Magic Touch","DaG","legacy"],[317,"Hell Ball II","romgames","legacy"],[318,"De Florale","Zerviot","legacy"],[319,"Vain","LimeTime313","legacy"],[320,"Hades Hell","GDVenom1","legacy"],[321,"Tuvalu","Crazey","legacy"],[322,"Kudos","Kxyyyy","legacy"],[323,"my mom is dead","PoweredByPie","legacy"],[324,"Balaball","Gorling","legacy"],[325,"8063","Nwolc","legacy"],[326,"Cabin Fever","DoubleEggSalad","legacy"],[327,"Demolish","Zagros","legacy"],[328,"Yubin","nayf","legacy"],[329,"Not The Golden Wave","Poobah","legacy"],[330,"pain","Zentraa","legacy"],[331,"Cube Timings 3","nerveless","legacy"],[332,"Personal Challenge X","ErinaLaSacarina","legacy"],[333,"Challenger","GDVenom1","legacy"],[334,"I Love You","Zentraa","legacy"],[335,"Riboid","maleg016","legacy"],[336,"Challengester","Zagros","legacy"],[337,"Challenge XX","FLIPJB","legacy"],[338,"Pennutoh Challenge","Zeronium","legacy"],[339,"Sorrow Chamber","xEl3cTr0","legacy"],[340,"your mom challenge","PoweredByPie","legacy"],[341,"Breathing Room","LimeTime313","legacy"],[342,"UBaSUNhW","BoBoBoBoBoBoBo","legacy"],[343,"gizmo gulCh","jackmeup","legacy"],[344,"Demonlist challenge","Pablohh","legacy"],[345,"Zone Wave","Blathers","legacy"],[346,"Random Chimp Event","crumche","legacy"],[347,"liverpool","Combined","legacy"],[348,"Deterioration","Woom","legacy"],[349,"Challenge XII","Gooey","legacy"],[350,"hard wave thingy","ItzKelly","legacy"],[351,"Venom Challenge","Zagros","legacy"],[352,"taste beat penetrate","Andrea7171","legacy"],[353,"Georgia Chamber","paqoe","legacy"],[354,"Lamp Level 1","GDVenom1","legacy"],[355,"BL Swingcopter ch","MetaManZ","legacy"],[356,"Kristina Vogel","Woom","legacy"],[357,"Planned Parenthood","AlphaneticGD","legacy"],[358,"shulk abp","Synactive GD","legacy"],[359,"Y a m a x a n a d u","GenoXideGD","legacy"],[360,"Bear grylls","BoBoBoBoBoBoBo","legacy"],[361,"dancing massacre","Electrolyte99","legacy"],[362,"AtroCity","bomf","legacy"],[363,"NASTY","ColorBolt","legacy"],[364,"Funk God","sizzli","legacy"],[365,"Kadra","CWKey","legacy"],[366,"Challenge II","iNeo","legacy"],[367,"cong challenge III","lolwut","legacy"],[368,"click consistency v3","Shuri","legacy"],[369,"Challenge XI","Gooey","legacy"],[370,"Transience","GDVenom1","legacy"],[371,"Box Benta","BoBoBoBoBoBoBo","legacy"],[372,"challenge IX","Gooey","legacy"],[373,"Parasite","Axinity","legacy"],[374,"AbomiNation","bomf","legacy"],
+  // REMOVED (375–408)
+  [375,"jumps mastery","SeptaGon7","removed"],[376,"Im Deaf","Diamond","removed"],[377,"Flight of Hell","Iando","removed"],[378,"Determination Dance","Cursed","removed"],[379,"Impertinence","maxmur","removed"],[380,"D","BoBoBoBoBoBoBo","removed"],[381,"DIAMOND DANCE","sizzli","removed"],[382,"3SH is Dead","UFWM","removed"],[383,"I see","Cursed","removed"],[384,"Albondiga","ErinaLaSacarina","removed"],[385,"FINAL DESTINATION","IcEDCave OG","removed"],[386,"Chall List Smelly","Hyperbola","removed"],[387,"gay lol ULTIMATE","Nyan Cat","removed"],[388,"Sakupen circles 66p","AkiraKurisu","removed"],[389,"LAST RESORT","saturn","removed"],[390,"Kinda Hard Challenge","IIKugelBlitZII","removed"],[391,"Techno Love","DaG","removed"],[392,"Ganja Guay","ErinaLaSacarina","removed"],[393,"el3ctr0b4llz","Hyperlith","removed"],[394,"AAHhaa Old","Nyan Cat","removed"],[395,"Subsuming Vortex 66p","HaydenDom","removed"],[396,"i suppose","HaydenDom","removed"],[397,"bedrock dance","Suni","removed"],[398,"66 tea","HaydenDom","removed"],[399,"Bioody Knuckles","Nyan Cat","removed"],[400,"Impertinencer","maxmur","removed"],[401,"Aquamarine 66p","toonm","removed"],[402,"coughy bean v2","HaydenDom","removed"],[403,"❌❌","BiancaDiAngelo","removed"],[404,"3SH in Hell","UFWM","removed"],[405,"FINAL FLIGHT","Caleger","removed"],[406,"Diamondium","Kirior","removed"],[407,"Vanuatu","nayf","removed"],[408,"cube challenge btw","Caleger","removed"]
+];
+
+let history = [];
+let rolled = 0;
+let seenIds = new Set();
+let activeFilters = new Set(['main','legacy','removed']);
+
+// Filter toggles
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const t = btn.dataset.type;
+    if (activeFilters.has(t)) {
+      if (activeFilters.size === 1) return; // keep at least one
+      activeFilters.delete(t);
+      btn.classList.remove('active');
+    } else {
+      activeFilters.add(t);
+      btn.classList.add('active');
+    }
+    updatePoolCount();
+  });
+});
+
+function getPool() {
+  return ALL_CHALLENGES.filter(c => activeFilters.has(c[3]));
+}
+
+function updatePoolCount() {
+  document.getElementById('stat-pool').textContent = getPool().length;
+}
+
+const TYPE_LABELS = { main: '⚡ Main List', legacy: '☁ Legacy', removed: '✕ Removed' };
+const TYPE_RANK_PREFIX = { main: '#', legacy: 'Legacy #', removed: 'Removed #' };
+
+function roll() {
+  const pool = getPool();
+  if (!pool.length) return;
+
+  const btn = document.getElementById('roll-btn');
+  btn.classList.add('rolling');
+  btn.disabled = true;
+
+  setTimeout(() => {
+    btn.classList.remove('rolling');
+    btn.disabled = false;
+
+    const c = pool[Math.floor(Math.random() * pool.length)];
+    const [rank, name, author, type] = c;
+
+    // Update card
+    const header = document.getElementById('card-header');
+    header.className = 'card-header type-' + type;
+    header.innerHTML = `<span>${TYPE_LABELS[type]}</span><span style="font-size:10px;opacity:0.6">${rank} of 408</span>`;
+
+    document.getElementById('lv-rank').textContent = TYPE_RANK_PREFIX[type] + rank;
+    document.getElementById('lv-name').textContent = name;
+    document.getElementById('lv-author').textContent = author;
+    document.getElementById('lv-link').href = `https://challengelist.gd/challenges/${rank}`;
+
+    const card = document.getElementById('result-card');
+    card.classList.remove('visible');
+    void card.offsetWidth;
+    card.classList.add('visible');
+
+    // Stats
+    rolled++;
+    seenIds.add(rank);
+    document.getElementById('stat-rolled').textContent = rolled;
+    document.getElementById('stat-unique').textContent = seenIds.size;
+    document.getElementById('stat-pool').textContent = pool.length;
+    document.getElementById('stats-row').style.display = 'flex';
+
+    // History
+    addHistory(rank, name, author, type);
+  }, 120);
+}
+
+function addHistory(rank, name, author, type) {
+  history.unshift({ rank, name, author, type });
+  const list = document.getElementById('history-list');
+  const item = document.createElement('div');
+  item.className = `history-item type-${type}`;
+  item.innerHTML = `
+    <span class="history-rank">${rank}</span>
+    <span class="history-name">${name}</span>
+    <span class="history-author">${author}</span>
+  `;
+  list.insertBefore(item, list.firstChild);
+  document.getElementById('history-section').style.display = 'block';
+}
+
+function clearHistory() {
+  history = [];
+  rolled = 0;
+  seenIds.clear();
+  document.getElementById('history-list').innerHTML = '';
+  document.getElementById('history-section').style.display = 'none';
+  document.getElementById('stats-row').style.display = 'none';
+  document.getElementById('result-card').classList.remove('visible');
+}
+
+// Init pool count on load
+updatePoolCount();
+</script>
+</body>
+</html>
